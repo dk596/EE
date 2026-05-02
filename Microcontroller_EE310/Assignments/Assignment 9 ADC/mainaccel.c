@@ -1,0 +1,257 @@
+/*
+ * The purpose of this program is to read an accelerometer and output
+ * acceleration to 16x2 LCD
+ * Author: Farid Farahmand, Derek Kan
+ */
+
+
+#include <xc.h> // must have this
+#include "header.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+//#include "../../../../../Program Files/Microchip/xc8/v2.40/pic/include/proc/pic18f46k42.h"
+//#include "C:\Program Files\Microchip\xc8\v2.40\pic\include\proc\pic18f46k42"
+
+#define _XTAL_FREQ 4000000                 // Fosc  frequency for _delay()  library
+#define FCY    _XTAL_FREQ/4
+
+#define RS LATD0                   /* PORTD 0 pin is used for Register Select */
+#define EN LATD1                   /* PORTD 1 pin is used for Enable */
+#define ldata LATB                 /* PORTB is used for transmitting data to LCD */
+#define Vref 3.3 // voltage reference 
+
+#define LCD_Port TRISB              
+#define LCD_Control TRISD
+
+int digital; // holds the digital value 
+float voltage; // hold the analog value (volt))
+char data[10];
+float accel; // holds acceleration value
+int shake_counter;
+float prev_accel;
+float accel_delta;
+void ADC_Init(void);
+void LCD_Init(void);
+void LCD_Command(char );
+void LCD_Char(char x);
+void LCD_String(const char *);
+void LCD_String_xy(char ,char ,const char*);
+void MSdelay(unsigned int );
+void LCD_Clear(void);
+
+/*****************************Main Program*******************************/
+
+void main(void)
+{     
+    __delay_ms(100);
+    ANSELD = 0x00;
+    ANSELB = 0x00;
+    ANSELC = 0x00;
+    TRISC = 0xFF;
+    IOCCPbits.IOCCP1 = 1;     // Enable Positive Edge detection
+    IOCCNbits.IOCCN1 = 0;     // Disable Negative Edge detection
+    
+        // Unlock IVT
+    IVTLOCK = 0x55;
+    IVTLOCK = 0xAA;
+    IVTLOCKbits.IVTLOCKED = 0; 
+
+    // Set Vector Table Base to 0x0008
+    IVTBASEU = 0x00;
+    IVTBASEH = 0x00;
+    IVTBASEL = 0x08; 
+
+    // Lock IVT
+    IVTLOCK = 0x55;
+    IVTLOCK = 0xAA;
+    IVTLOCKbits.IVTLOCKED = 1; 
+    
+    volatile char dummy = PORTC;
+    IOCCFbits.IOCCF1 = 0; 
+    PIE0bits.IOCIE = 1; // Enable Interrupt-on-Change
+    INTCON0bits.IPEN = 1; // Enable interrupt priority
+    INTCON0bits.GIEH = 1; // Enable high priority interrupts
+    INTCON0bits.GIEL = 1; // Enable low priority interrupts
+    PMD0bits.IOCMD = 0; 
+    IPR0bits.IOCIP = 1;
+    //OSCCON=0x72;                   /* Use Internal Oscillator with Frequency 8MHZ */ 
+    ADC_Init();
+    LCD_Init();                    /* Initialize 16x2 LCD */
+    
+
+    __delay_ms(100);
+    prev_accel = 0;
+
+    while(1)
+    {
+        ADCON0bits.GO = 1; //Start conversion
+        while (ADCON0bits.GO); //Wait for conversion done
+        digital = (ADRESH*256) | (ADRESL);/*Combine 8-bit LSB and 2-bit MSB*/
+        voltage= digital*((float)Vref/(float)(4095)); 
+        accel=((voltage-(1.66))/0.3)*9.81;
+        //print on LCD 
+        /*It is used to convert integer value to ASCII string*/
+        sprintf(data,"%.2f",accel);
+
+        strcat(data," m/s^2 ");	/*Concatenate result and unit to print*/  
+        
+        accel_delta = abs(accel - prev_accel);
+        prev_accel = accel;
+        if (accel_delta > 3)
+        {
+            shake_counter++;
+            if (shake_counter >= 3)
+            {
+                LCD_String_xy(1,0,"Shake!           ");               
+            }
+            LCD_String_xy(2,0,data);
+            __delay_ms(1000);
+            continue;
+        }
+        else if (accel > 2)
+        {
+            LCD_String_xy(1,0,"Tilt Left       "); 
+        }
+        else if (accel < 0)
+        {
+            LCD_String_xy(1,0,"Tilt Right      "); 
+        }    
+        else
+        {
+            LCD_String_xy(1,0,"Level           ");    
+        }
+        shake_counter = 0;  
+        LCD_String_xy(2,0,data);   /*Display string at location(row,location). */
+                                   /* This function passes string to display */
+        __delay_ms(20);
+    }
+  
+            
+}
+
+/****************************Functions********************************/
+void LCD_Init(void)
+{
+    
+    MSdelay(15);           /* 15ms,16x2 LCD Power on delay */
+
+    LCD_Port = 0x00;       /* Set PORTB as output PORT for LCD data(D0-D7) pins */
+    LCD_Control = 0x00;    /* Set PORTD as output PORT LCD Control(RS,EN) Pins */
+    PORTB = 0x00;
+    PORTD = 0x00;
+    LATB = 0x00;
+    LATD = 0x00;
+    LCD_Command(0x30); 
+    MSdelay(5);
+    LCD_Command(0x30);
+    MSdelay(1);
+    LCD_Command(0x30);
+    MSdelay(1);
+    LCD_Command(0x01);     /* clear display screen */
+    LCD_Command(0x38);     /* uses 2 line and initialize 5*7 matrix of LCD */
+    LCD_Command(0x0c);     /* display on cursor off */
+    LCD_Command(0x06);     /* increment cursor (shift cursor to right) */
+}
+
+
+void LCD_Command(char cmd )
+{
+    ldata= cmd;            /* Send data to PORT as a command for LCD */   
+    RS = 0;                /* Command Register is selected */
+    EN = 1;                /* High-to-Low pulse on Enable pin to latch data */ 
+    NOP();
+    __delay_ms(1);
+    EN = 0;
+    MSdelay(3); 
+}
+
+void LCD_Char(char dat)
+{
+    ldata= dat;            /* Send data to LCD */  
+    RS = 1;                /* Data Register is selected */
+    EN=1;                  /* High-to-Low pulse on Enable pin to latch data */   
+    NOP();
+    __delay_ms(1);
+    EN=0;
+    MSdelay(1);
+}
+
+
+void LCD_String(const char *msg)
+{
+    while((*msg)!=0)
+    {       
+      LCD_Char(*msg);
+      msg++;    
+        }
+}
+
+void LCD_String_xy(char row,char pos,const char *msg)
+{
+    char location=0;
+    if(row<=1.5)
+    {
+        location=(0x80) | ((pos) & 0x0f); /*Print message on 1st row and desired location*/
+        LCD_Command(location);
+    }
+    else
+    {
+        location=(0xC0) | ((pos) & 0x0f); /*Print message on 2nd row and desired location*/
+        LCD_Command(location);    
+    }  
+    LCD_String(msg);
+
+}
+/*********************************Delay Function********************************/
+void MSdelay(unsigned int val)
+{
+     unsigned int i,j;
+        for(i=0;i<val;i++)
+            for(j=0;j<165;j++);      /*This count Provide delay of 1 ms for 8MHz Frequency */
+}
+
+
+void ADC_Init(void)
+{
+       //Setup ADC
+    ADCON0bits.FM = 1;  //right justify
+    ADCON0bits.CS = 1; //ADCRC Clock
+    
+    TRISAbits.TRISA0 = 1; //Set RA0 to input
+    ANSELAbits.ANSELA0 = 1; //Set RA0 to analog
+
+    // Added 
+    ADPCH = 0x00; //Set RA0 as Analog channel in ADC ADPCH
+    ADCLK = 0x00; //set ADC CLOCK Selection register to zero
+    
+    ADRESH = 0x00; // Clear ADC Result registers
+    ADRESL = 0x00; 
+    
+    ADPREL = 0x00; // set precharge select to 0 in register ADPERL & ADPERH
+    ADPREH = 0x00; 
+    
+    ADACQL = 0x00;  // set acquisition low and high byte to zero 
+    ADACQH = 0x00;    
+    
+    ADCON0bits.ON = 1; //Turn ADC On 
+}
+
+
+
+void __interrupt(irq(IRQ_IOC), base(0x0008)) IOC_ISR(void) {
+    if (IOCCFbits.IOCCF1) {
+        //blink an LED connected to PORTDbits.RD0 for 10 times
+        for (int i = 0; i < 5; i++) 
+            {
+                LATDbits.LD6 = 1;
+                __delay_ms(250);
+                LATDbits.LD6 = 0;
+                __delay_ms(250);   
+                
+            }
+        LATDbits.LD6 = 0;
+        IOCCFbits.IOCCF1 = 0; // Clear the flag after handling
+        while(1);
+    }
+}
