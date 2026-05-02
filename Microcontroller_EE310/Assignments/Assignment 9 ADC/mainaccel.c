@@ -27,6 +27,7 @@
 int digital; // holds the digital value 
 float voltage; // hold the analog value (volt))
 char data[10];
+char data2[10];
 float accel; // holds acceleration value
 int shake_counter;
 float prev_accel;
@@ -40,45 +41,62 @@ void LCD_String_xy(char ,char ,const char*);
 void MSdelay(unsigned int );
 void LCD_Clear(void);
 
+
+void __interrupt(irq(IRQ_IOC), base(0x0008)) DEFAULT_ISR(void){
+    if (IOCCFbits.IOCCF2) {
+        for (int i = 0; i < 5; i++) 
+            {
+                LATDbits.LD6 = 1;
+                __delay_ms(250);
+                LATDbits.LD6 = 0;
+                __delay_ms(250);   
+                
+            }
+        LATDbits.LD6 = 0;
+        IOCCFbits.IOCCF2= 0; // Clear the flag after handling
+    }
+}
+
 /*****************************Main Program*******************************/
 
 void main(void)
 {     
     __delay_ms(100);
-    ANSELD = 0x00;
-    ANSELB = 0x00;
+    
+
+    
+    
+    ANSELB = 0x00;   
     ANSELC = 0x00;
+    ANSELD = 0x00;
+    TRISB = 0x00;
     TRISC = 0xFF;
-    IOCCPbits.IOCCP1 = 1;     // Enable Positive Edge detection
-    IOCCNbits.IOCCN1 = 0;     // Disable Negative Edge detection
-    
-        // Unlock IVT
-    IVTLOCK = 0x55;
-    IVTLOCK = 0xAA;
-    IVTLOCKbits.IVTLOCKED = 0; 
-
-    // Set Vector Table Base to 0x0008
-    IVTBASEU = 0x00;
-    IVTBASEH = 0x00;
-    IVTBASEL = 0x08; 
-
-    // Lock IVT
-    IVTLOCK = 0x55;
-    IVTLOCK = 0xAA;
-    IVTLOCKbits.IVTLOCKED = 1; 
-    
-    volatile char dummy = PORTC;
-    IOCCFbits.IOCCF1 = 0; 
-    PIE0bits.IOCIE = 1; // Enable Interrupt-on-Change
-    INTCON0bits.IPEN = 1; // Enable interrupt priority
+    TRISD = 0x00;
+    PORTB = 0x00;
+    PORTD = 0x00;
+    LATB = 0x00;
+    LATD = 0x00;
+    RC1PPS = 0x00;
+    WPUCbits.WPUC2 = 0;
     INTCON0bits.GIEH = 1; // Enable high priority interrupts
     INTCON0bits.GIEL = 1; // Enable low priority interrupts
+    INTCON0bits.IPEN = 1; // Enable interrupt priority
+    PIE0bits.IOCIE = 1; // Enable Interrupt-on-Change
+    //PIE0 = 0xFF;
+    IOCCPbits.IOCCP2 = 1;     // Enable Positive Edge detection
+    IOCCNbits.IOCCN2 = 1;     // Disable Negative Edge detection
+    IPR0bits.IOCIP = 1;   //Enable High Priority for IOC
+    volatile unsigned char dummy = PORTC;
+    IOCCFbits.IOCCF2 = 0; // Clear flag
+
     PMD0bits.IOCMD = 0; 
-    IPR0bits.IOCIP = 1;
+  
     //OSCCON=0x72;                   /* Use Internal Oscillator with Frequency 8MHZ */ 
     ADC_Init();
     LCD_Init();                    /* Initialize 16x2 LCD */
-    
+    //INLVLCbits.INLVLC1 = 0; // Set RC1 to Schmitt Trigger (or 0 for TTL)
+    //IOCCFbits.IOCCF1 = 1; //testing interrupt
+ 
 
     __delay_ms(100);
     prev_accel = 0;
@@ -124,6 +142,7 @@ void main(void)
         shake_counter = 0;  
         LCD_String_xy(2,0,data);   /*Display string at location(row,location). */
                                    /* This function passes string to display */
+
         __delay_ms(20);
     }
   
@@ -138,16 +157,14 @@ void LCD_Init(void)
 
     LCD_Port = 0x00;       /* Set PORTB as output PORT for LCD data(D0-D7) pins */
     LCD_Control = 0x00;    /* Set PORTD as output PORT LCD Control(RS,EN) Pins */
-    PORTB = 0x00;
-    PORTD = 0x00;
-    LATB = 0x00;
-    LATD = 0x00;
-    LCD_Command(0x30); 
-    MSdelay(5);
-    LCD_Command(0x30);
-    MSdelay(1);
-    LCD_Command(0x30);
-    MSdelay(1);
+
+
+    //LCD_Command(0x30); 
+    //MSdelay(5);
+    //LCD_Command(0x30);
+    //MSdelay(1);
+    //LCD_Command(0x30);
+    //MSdelay(1);
     LCD_Command(0x01);     /* clear display screen */
     LCD_Command(0x38);     /* uses 2 line and initialize 5*7 matrix of LCD */
     LCD_Command(0x0c);     /* display on cursor off */
@@ -239,19 +256,4 @@ void ADC_Init(void)
 
 
 
-void __interrupt(irq(IRQ_IOC), base(0x0008)) IOC_ISR(void) {
-    if (IOCCFbits.IOCCF1) {
-        //blink an LED connected to PORTDbits.RD0 for 10 times
-        for (int i = 0; i < 5; i++) 
-            {
-                LATDbits.LD6 = 1;
-                __delay_ms(250);
-                LATDbits.LD6 = 0;
-                __delay_ms(250);   
-                
-            }
-        LATDbits.LD6 = 0;
-        IOCCFbits.IOCCF1 = 0; // Clear the flag after handling
-        while(1);
-    }
-}
+
