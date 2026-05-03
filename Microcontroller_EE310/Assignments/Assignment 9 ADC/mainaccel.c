@@ -1,7 +1,22 @@
 /*
+ * ---------------------
+ * Title: Read Accelerometer on LCD
+ * ---------------------
+ * Program Details:
  * The purpose of this program is to read an accelerometer and output
  * acceleration to 16x2 LCD
- * Author: Farid Farahmand, Derek Kan
+ * Inputs: RC2, RC3, RC4
+ * Outputs: PORTD, RB0, RB3
+ * Date: 5/2/26
+ * File Dependencies / Libraries: It is required to include the 
+ * Configuration Header File 
+ * Compiler: xc8, 3.10
+ * Device: PIC18F47K42
+ * Author: Derek Kan
+ * Code based on code by Dr. Farahmand
+ * Versions:
+ *      V1.0: Basic implementation 
+ *      V1.1: Added comments
  */
 
 
@@ -10,8 +25,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-//#include "../../../../../Program Files/Microchip/xc8/v2.40/pic/include/proc/pic18f46k42.h"
-//#include "C:\Program Files\Microchip\xc8\v2.40\pic\include\proc\pic18f46k42"
 
 #define _XTAL_FREQ 4000000                 // Fosc  frequency for _delay()  library
 #define FCY    _XTAL_FREQ/4
@@ -27,11 +40,10 @@
 int digital; // holds the digital value 
 float voltage; // hold the analog value (volt))
 char data[10];
-char data2[10];
 float accel; // holds acceleration value
 int shake_counter;
-float prev_accel;
-float accel_delta;
+float prev_accel; //holds previous acceleration value
+float accel_delta; //delta between accel and prev_accel
 void ADC_Init(void);
 void LCD_Init(void);
 void LCD_Command(char );
@@ -46,7 +58,7 @@ void __interrupt(irq(IRQ_IOC), base(0x0008)) DEFAULT_ISR(void){
     if (IOCCFbits.IOCCF2) {
         for (int i = 0; i < 5; i++) 
             {
-                LATDbits.LD6 = 1;
+                LATDbits.LD6 = 1;  //blink LED
                 __delay_ms(250);
                 LATDbits.LD6 = 0;
                 __delay_ms(250);   
@@ -61,43 +73,28 @@ void __interrupt(irq(IRQ_IOC), base(0x0008)) DEFAULT_ISR(void){
 
 void main(void)
 {     
-    __delay_ms(100);
-    
-
-    
-    
-    ANSELB = 0x00;   
+    __delay_ms(100);   
+    ANSELB = 0x00;   // Enable B, C, D as digital
     ANSELC = 0x00;
     ANSELD = 0x00;
-    TRISB = 0x00;
+    TRISB = 0x00;   //Enable B, D as outputs, C as input
     TRISC = 0xFF;
     TRISD = 0x00;
-    PORTB = 0x00;
+    PORTB = 0x00;    //Clear B, D
     PORTD = 0x00;
     LATB = 0x00;
     LATD = 0x00;
-    RC1PPS = 0x00;
-    WPUCbits.WPUC2 = 0;
+    WPUCbits.WPUC2 = 0;   //Make sure pull up is off for RC2
     INTCON0bits.GIEH = 1; // Enable high priority interrupts
     INTCON0bits.GIEL = 1; // Enable low priority interrupts
     INTCON0bits.IPEN = 1; // Enable interrupt priority
     PIE0bits.IOCIE = 1; // Enable Interrupt-on-Change
-    //PIE0 = 0xFF;
     IOCCPbits.IOCCP2 = 1;     // Enable Positive Edge detection
     IOCCNbits.IOCCN2 = 1;     // Disable Negative Edge detection
     IPR0bits.IOCIP = 1;   //Enable High Priority for IOC
-    volatile unsigned char dummy = PORTC;
     IOCCFbits.IOCCF2 = 0; // Clear flag
-
-    PMD0bits.IOCMD = 0; 
-  
-    //OSCCON=0x72;                   /* Use Internal Oscillator with Frequency 8MHZ */ 
-    ADC_Init();
-    LCD_Init();                    /* Initialize 16x2 LCD */
-    //INLVLCbits.INLVLC1 = 0; // Set RC1 to Schmitt Trigger (or 0 for TTL)
-    //IOCCFbits.IOCCF1 = 1; //testing interrupt
- 
-
+    ADC_Init();                 // Initialize ADC
+    LCD_Init();                    // Initialize 16x2 LCD 
     __delay_ms(100);
     prev_accel = 0;
 
@@ -118,13 +115,16 @@ void main(void)
         prev_accel = accel;
         if (accel_delta > 3)
         {
-            shake_counter++;
+            shake_counter++; //multiple high deltas in a row is a shake
             if (shake_counter >= 3)
             {
-                LCD_String_xy(1,0,"Shake!           ");               
+                LCD_String_xy(1,0,"Shake!           "); 
+                LCD_String_xy(2,0,data);
+                __delay_ms(1000); //display shake for a longer time
+                continue;
             }
             LCD_String_xy(2,0,data);
-            __delay_ms(1000);
+            __delay_ms(20);
             continue;
         }
         else if (accel > 2)
@@ -157,14 +157,6 @@ void LCD_Init(void)
 
     LCD_Port = 0x00;       /* Set PORTB as output PORT for LCD data(D0-D7) pins */
     LCD_Control = 0x00;    /* Set PORTD as output PORT LCD Control(RS,EN) Pins */
-
-
-    //LCD_Command(0x30); 
-    //MSdelay(5);
-    //LCD_Command(0x30);
-    //MSdelay(1);
-    //LCD_Command(0x30);
-    //MSdelay(1);
     LCD_Command(0x01);     /* clear display screen */
     LCD_Command(0x38);     /* uses 2 line and initialize 5*7 matrix of LCD */
     LCD_Command(0x0c);     /* display on cursor off */
@@ -253,7 +245,3 @@ void ADC_Init(void)
     
     ADCON0bits.ON = 1; //Turn ADC On 
 }
-
-
-
-
