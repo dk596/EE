@@ -56,12 +56,12 @@ void LCD_Clear(void);
 
 void __interrupt(irq(IRQ_IOC), base(0x0008)) DEFAULT_ISR(void){
     if (IOCCFbits.IOCCF2) {
-        for (int i = 0; i < 5; i++) 
+        for (int i = 0; i < 10; i++) 
             {
                 LATDbits.LD6 = 1;  //blink LED
-                __delay_ms(250);
+                __delay_ms(500);
                 LATDbits.LD6 = 0;
-                __delay_ms(250);   
+                __delay_ms(500);   
                 
             }
         LATDbits.LD6 = 0;
