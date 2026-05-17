@@ -21,7 +21,7 @@
 
 #include <xc.h> // must have this
 #include "header.h"
-#include "PWMheader.h"
+#include "functions.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
