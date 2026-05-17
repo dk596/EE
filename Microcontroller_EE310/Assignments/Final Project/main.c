@@ -15,12 +15,13 @@
  * Code based on code by Dr. Farahmand
  * Versions:
  *      V1.0: Basic implementation 
- *      
+ *      V1.1: Added servo motor
  */
 
 
 #include <xc.h> // must have this
 #include "header.h"
+#include "PWMheader.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -54,9 +55,11 @@ void MSdelay(unsigned int );
 void LCD_Clear(void);
 int calc_dist(void);
 int current_distance;
-
+float smoothedDistance = 0.0;
+float alpha = 0.3; // Smoothing factor (Between 0.0 and 1.0)
+                   // Lower = smoother but slower response. Higher = faster but twitchier.
 void __interrupt(irq(IRQ_IOC), base(0x0008)) DEFAULT_ISR(void){
-    if (IOCCFbits.IOCCF2) {
+    if (IOCAFbits.IOCAF1) {
         for (int i = 0; i < 10; i++) 
             {
                 LATDbits.LD6 = 1;  //blink LED
@@ -66,7 +69,7 @@ void __interrupt(irq(IRQ_IOC), base(0x0008)) DEFAULT_ISR(void){
                 
             }
         LATDbits.LD6 = 0;
-        IOCCFbits.IOCCF2= 0; // Clear the flag after handling
+        IOCAFbits.IOCAF1 = 0; // Clear the flag after handling
     }
 }
 
@@ -83,35 +86,71 @@ void main(void)
     TRISA = 0xFF; //Set RA0 to input
     ANSELA = 0x00; //Set RA0 to digital
     TRISB = 0x00;   //Enable B, D as outputs, C as input
-    TRISC = 0xFF;
+    TRISC = 0x00;
     TRISD = 0x00;
     TRISE = 0x00;
+
     PORTB = 0x00;    //Clear B, D
     PORTD = 0x00;
     LATB = 0x00;
     LATD = 0x00;
     LATEbits.LE0 = 1;
-    WPUCbits.WPUC2 = 0;   //Make sure pull up is off for RC2
+    WPUAbits.WPUA1 = 1;   //Make sure pull up is on for RA1
     INTCON0bits.GIEH = 1; // Enable high priority interrupts
     INTCON0bits.GIEL = 1; // Enable low priority interrupts
     INTCON0bits.IPEN = 1; // Enable interrupt priority
     PIE0bits.IOCIE = 1; // Enable Interrupt-on-Change
-    IOCCPbits.IOCCP2 = 1;     // Enable Positive Edge detection
-    IOCCNbits.IOCCN2 = 1;     // Disable Negative Edge detection
+    IOCANbits.IOCAN1 = 1;      // Enable Positive Edge detection
+    IOCAPbits.IOCAP1 = 1;     // Disable Negative Edge detection
     IPR0bits.IOCIP = 1;   //Enable High Priority for IOC
-    IOCCFbits.IOCCF2 = 0; // Clear flag
+    IOCAFbits.IOCAF1 = 0; // Clear flag
+    OSCSTATbits.HFOR =1; // enable  HFINTOSC Oscillator (see clock schematic))
+    OSCFRQ=0x02; // 00=1 MHZ, 02=4MHZ internal - see page 106 of data sheet
     LCD_Init();                    // Initialize 16x2 LCD 
     Timer1_Init();
+    TMR2_Initialize();
+    TMR2_StartTimer();  
+    PWM_Output_Enable();
+    PWM2_Initialize();
     
     __delay_ms(100);
     prev_accel = 0;
     while(1)
     {
-        current_distance = calc_dist();
-        sprintf(data, "%d", current_distance); 
+        uint16_t readings[3];
+        readings[0] = calc_dist();
+        __delay_ms(15);
+        readings[1] = calc_dist();
+        __delay_ms(15);
+        readings[2] = calc_dist();
+        if (readings[0] > readings[1]) { int temp = readings[0]; readings[0] = readings[1]; readings[1] = temp; }
+        if (readings[1] > readings[2]) { int temp = readings[1]; readings[1] = readings[2]; readings[2] = temp; }
+        if (readings[0] > readings[1]) { int temp = readings[0]; readings[0] = readings[1]; readings[1] = temp; }
+        
+        
+        float rawDistance = readings[1];
+            // First run initialization
+        if (smoothedDistance == 0.0) 
+        {
+           smoothedDistance = rawDistance;
+        }
+        smoothedDistance = (alpha * rawDistance) + ((1.0 - alpha) * smoothedDistance);
+        
+        current_distance = smoothedDistance;
+        sprintf(data, "%d", readings[1]); 
         strcat(data," cm     ");	/*Concatenate result and unit to print*/ 
         LCD_String_xy(1,0,data);
-        __delay_ms(1);
+        if (current_distance < 50)
+        {
+            PWM2_LoadDutyValue(current_distance + 20);
+            //PWM2_LoadDutyValue(current_distance + 20);
+        }
+        else
+        {
+            PWM2_LoadDutyValue(75);
+        }
+        
+        __delay_ms(15);
     }
   
             
@@ -228,7 +267,7 @@ int calc_dist(void)
     // Calculate distance
     // (Ensure your Fosc/4 is 1MHz for this divisor to be accurate)
     //distance = TMR1 / 58; 
-    distance = TMR1 / 11.6; 
+    distance = TMR1 / 46.4; 
     return distance;
 
 }
