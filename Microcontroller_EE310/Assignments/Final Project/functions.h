@@ -2,7 +2,6 @@
  * File:   functions.h
  * Author: Derek Kan, credit to Dr. Farahmand for base code
  *
- * Created on May 1, 2023, 9:02 AM
  */
 
 #ifndef PWM_H
@@ -12,8 +11,15 @@
 extern "C" {
 #endif
 
+#define _XTAL_FREQ 4000000                 // Fosc  frequency for _delay()  library
+#define FCY    _XTAL_FREQ/4
+#define RS LATD0                   /* PORTD 0 pin is used for Register Select */
+#define EN LATD1                   /* PORTD 1 pin is used for Enable */
+#define ldata LATB                 /* PORTB is used for transmitting data to LCD */
 
 
+#define LCD_Port TRISB              
+#define LCD_Control TRISD
 
 #ifdef	__cplusplus
 }
@@ -22,9 +28,6 @@ extern "C" {
 #endif	/* PWM_H */
 
 
-
-//void PWM_Output_D8_Enable (void);
-//void PWM_Output_D8_Disable (void);
 
 ///////////////  TIMER 2
 void TMR2_Initialize(void)
@@ -49,7 +52,6 @@ void TMR2_Initialize(void)
     // Clearing IF flag.
     PIR4bits.TMR2IF = 0;
 
-    // T2CKPS 1:1; T2OUTPS 1:1; TMR2ON on; 
     T2CONbits.CKPS = 0b111; //1:128 scale
 }
 
@@ -134,8 +136,8 @@ void PWM_Output_Disable (void){
     PPSLOCK = 0xAA; 
     PPSLOCKbits.PPSLOCKED = 0x00; // unlock PPS
 
-    // Set D2 as GPIO pin
-    RD2PPS = 0x0A;
+    // Set C2 as GPIO pin
+    RC2PPS = 0x0A;
 
     PPSLOCK = 0x55; 
     PPSLOCK = 0xAA; 
@@ -183,4 +185,126 @@ void PWM2_LoadDutyValue(uint16_t dutyValue)
 {
     // Returns the output status
     return(CCP2CONbits.OUT);
+}
+ 
+void LCD_Command(char cmd )
+{
+    ldata= cmd;            /* Send data to PORT as a command for LCD */   
+    RS = 0;                /* Command Register is selected */
+    EN = 1;                /* High-to-Low pulse on Enable pin to latch data */ 
+    NOP();
+    EN = 0;
+    __delay_ms(3);
+}
+
+void LCD_Init(void)
+{
+    
+    __delay_ms(15);          /* 15ms,16x2 LCD Power on delay */
+    LCD_Port = 0x00;       /* Set PORTB as output PORT for LCD data(D0-D7) pins */
+    LCD_Control = 0x00;    /* Set PORTD as output PORT LCD Control(RS,EN) Pins */
+    LCD_Command(0x01);     /* clear display screen */
+    LCD_Command(0x38);     /* uses 2 line and initialize 5*7 matrix of LCD */
+    LCD_Command(0x0c);     /* display on cursor off */
+    LCD_Command(0x06);     /* increment cursor (shift cursor to right) */
+}
+
+
+
+
+void LCD_Char(char dat)
+{
+    ldata= dat;            /* Send data to LCD */  
+    RS = 1;                /* Data Register is selected */
+    EN=1;                  /* High-to-Low pulse on Enable pin to latch data */   
+    NOP();
+    EN=0;
+    __delay_ms(1);  
+}
+
+
+void LCD_String(const char *msg)
+{
+    while((*msg)!=0)
+    {       
+      LCD_Char(*msg);
+      msg++;    
+        }
+}
+
+void LCD_String_xy(char row,char pos,const char *msg)
+{
+    char location=0;
+    if(row<=1.5)
+    {
+        location=(0x80) | ((pos) & 0x0f); /*Print message on 1st row and desired location*/
+        LCD_Command(location);
+    }
+    else
+    {
+        location=(0xC0) | ((pos) & 0x0f); /*Print message on 2nd row and desired location*/
+        LCD_Command(location);    
+    }  
+    LCD_String(msg);
+
+}
+
+
+void Timer1_Init(void)
+{
+    T1CONbits.CKPS = 0b00;  // Prescaler 1:1
+    T1CLK = 0b0001;         // Clock source: Fosc/4
+    T1CONbits.ON = 1;       // Enable Timer1
+
+}
+
+
+int calc_dist(void)
+{
+    int distance = 0;
+    uint16_t timeout = 0;
+    // Reset Timer1 count
+    TMR1 = 0;
+    PORTA = 0x00;
+    // Send at least 10us Trigger Pulse
+    LATDbits.LATD3 = 1;      
+    __delay_us(12);
+    LATDbits.LATD3 = 0;
+
+    // Wait for Echo Pulse to start (High) on RA0
+    while(!PORTAbits.RA0)
+    {
+        timeout++;
+        if(timeout > 5000) 
+        {
+            return -1.0; // Echo failed to start! Exit immediately to prevent freezing.
+        }        
+    }
+    timeout = 0;
+    // Turn ON Timer1
+    T1CONbits.ON = 1;
+
+    // Wait for Echo Pulse to end (Low) on RA0
+
+    while(PORTAbits.RA0)
+    {
+        timeout++;
+        if(timeout > 5000) 
+        {
+            return -1.0; // Echo failed to start! Exit immediately to prevent freezing.
+        }   
+    }
+    timeout = 0;
+    // Turn OFF Timer1
+    T1CONbits.ON = 0;
+    
+    // Calculate distance
+    //distance = TMR1 / 58;
+    if (TMR1 <= 10000)
+    {
+       distance = TMR1 / 58;  
+    }
+    
+    return distance;
+
 }
