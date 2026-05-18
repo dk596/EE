@@ -4,8 +4,8 @@
 // 'C' source line config statements
 
 // CONFIG1L
-#pragma config FEXTOSC = LP     // External Oscillator Selection (LP (crystal oscillator) optimized for 32.768 kHz; PFM set to low power)
-#pragma config RSTOSC = EXTOSC  // Reset Oscillator Selection (EXTOSC operating per FEXTOSC bits (device manufacturing default))
+#pragma config FEXTOSC = OFF     // External Oscillator Selection (LP (crystal oscillator) optimized for 32.768 kHz; PFM set to low power)
+#pragma config RSTOSC = HFINTOSC_64MHZ  // Reset Oscillator Selection (EXTOSC operating per FEXTOSC bits (device manufacturing default))
 
 // CONFIG1H
 #pragma config CLKOUTEN = OFF   // Clock out Enable bit (CLKOUT function is disabled)
