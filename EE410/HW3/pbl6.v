@@ -13,7 +13,7 @@ module top_module ();
   integer error_count = 0;
 
   // Instantiate the adder module
-  pbl5 test (
+  pbl6 test (
     .a(a),
     .b(b),
     .c(c)
@@ -54,7 +54,7 @@ module top_module ();
 endmodule
 
 
-module pbl5 (
+module pbl6 (
     input  [3:0] a,
     input  [3:0] b,
     output [4:0] c
