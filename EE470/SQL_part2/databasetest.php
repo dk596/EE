@@ -2,18 +2,14 @@
 date_default_timezone_set('America/Los_Angeles');
 require_once 'db.php';
 
-$nodes = $pdo->query('SELECT * FROM sensor_register ORDER BY node_name ASC')->fetchAll(PDO::FETCH_ASSOC);
-$sensorData = $pdo->query('SELECT * FROM sensor_data ORDER BY node_name ASC, time_received ASC')->fetchAll(PDO::FETCH_ASSOC);
+$nodes = $pdo->query('SELECT * FROM sensor_register ORDER BY node_name')->fetchAll();
+$sensorData = $pdo->query('SELECT * FROM sensor_data ORDER BY node_name, time_received')->fetchAll();
 
-// Get selected node from dropdown (defaults to the first registered node if none chosen)
 $selectedNode = $_GET['node'] ?? ($nodes[0]['node_name'] ?? '');
-
-// Filter data for the selected node
-$filteredData = array_filter($sensorData, fn($r) => $r['node_name'] === $selectedNode);
+$filteredData = array_values(array_filter($sensorData, fn($r) => $r['node_name'] === $selectedNode));
 $temps  = array_column($filteredData, 'temperature');
 $humids = array_column($filteredData, 'humidity');
 
-// Compute stats if readings exist for this node
 $hasData = !empty($temps);
 $avgTemp = $hasData ? round(array_sum($temps) / count($temps), 2) : 0;
 $avgHum  = $hasData ? round(array_sum($humids) / count($humids), 2) : 0;
@@ -22,44 +18,22 @@ $minHum  = $hasData ? min($humids) : 0;
 ?>
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Sensor Data</title>
-</head>
+<head><title>Sensor Data</title></head>
 <body>
 
     <h2>Registered Sensor Nodes</h2>
     <table border="1">
-        <tr>
-            <th>Node Name</th>
-            <th>Manufacturer</th>
-            <th>Longitude</th>
-            <th>Latitude</th>
-        </tr>
-        <?php foreach ($nodes as $node): ?>
-            <tr>
-                <td><?= htmlspecialchars($node['node_name']) ?></td>
-                <td><?= htmlspecialchars($node['manufacturer']) ?></td>
-                <td><?= htmlspecialchars($node['longitude']) ?></td>
-                <td><?= htmlspecialchars($node['latitude']) ?></td>
-            </tr>
+        <tr><th>Node Name</th><th>Manufacturer</th><th>Longitude</th><th>Latitude</th></tr>
+        <?php foreach ($nodes as $n): ?>
+            <tr><td><?= $n['node_name'] ?></td><td><?= $n['manufacturer'] ?></td><td><?= $n['longitude'] ?></td><td><?= $n['latitude'] ?></td></tr>
         <?php endforeach; ?>
     </table>
 
     <h2>Data Received</h2>
     <table border="1">
-        <tr>
-            <th>Node Name</th>
-            <th>Time Received</th>
-            <th>Temperature (°F)</th>
-            <th>Humidity (%)</th>
-        </tr>
-        <?php foreach ($sensorData as $entry): ?>
-            <tr>
-                <td><?= htmlspecialchars($entry['node_name']) ?></td>
-                <td><?= htmlspecialchars($entry['time_received']) ?></td>
-                <td><?= htmlspecialchars($entry['temperature']) ?></td>
-                <td><?= htmlspecialchars($entry['humidity']) ?></td>
-            </tr>
+        <tr><th>Node Name</th><th>Time Received</th><th>Temperature (°F)</th><th>Humidity (%)</th></tr>
+        <?php foreach ($sensorData as $d): ?>
+            <tr><td><?= $d['node_name'] ?></td><td><?= $d['time_received'] ?></td><td><?= $d['temperature'] ?></td><td><?= $d['humidity'] ?></td></tr>
         <?php endforeach; ?>
     </table>
 
@@ -67,9 +41,9 @@ $minHum  = $hasData ? min($humids) : 0;
     <form method="GET">
         <label for="node">Select Node:</label>
         <select name="node" id="node" onchange="this.form.submit()">
-            <?php foreach ($nodes as $node): ?>
-                <option value="<?= htmlspecialchars($node['node_name']) ?>" <?= $node['node_name'] === $selectedNode ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($node['node_name']) ?>
+            <?php foreach ($nodes as $n): ?>
+                <option value="<?= $n['node_name'] ?>" <?= $n['node_name'] === $selectedNode ? 'selected' : '' ?>>
+                    <?= $n['node_name'] ?>
                 </option>
             <?php endforeach; ?>
         </select>
@@ -93,7 +67,8 @@ $minHum  = $hasData ? min($humids) : 0;
     <?php else: ?>
         <p>No telemetry recorded yet for <?= htmlspecialchars($selectedNode) ?>.</p>
     <?php endif; ?>
+
     <h2>Node Data (JSON Format)</h2>
-    <pre><?= json_encode(array_values($filteredData), JSON_PRETTY_PRINT) ?></pre>
+    <pre><?= json_encode($filteredData, JSON_PRETTY_PRINT) ?></pre>
 </body>
 </html>
