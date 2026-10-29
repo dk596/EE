@@ -5,7 +5,7 @@ header('Content-Type: application/json');
 //database
 define('DB_HOST', 'localhost');
 define('DB_USERNAME', 'u130146560_db_DerekKan');
-define('DB_PASSWORD', 'xxxxxxxxxxx');
+define('DB_PASSWORD', '5e6B;V2tmZG#K?@');
 define('DB_NAME', 'u130146560_DerekKan');
 
 //get connection
