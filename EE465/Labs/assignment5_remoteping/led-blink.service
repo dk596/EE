@@ -1,0 +1,13 @@
+[Unit]
+Description=Blink LED at Boot Service
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/dk1991/python_stuff/blink_boot.py
+WorkingDirectory=/home/dk1991/python_stuff
+Restart=always
+User=dk1991
+
+[Install]
+WantedBy=multi-user.target
