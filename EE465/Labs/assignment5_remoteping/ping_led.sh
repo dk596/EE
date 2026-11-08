@@ -24,6 +24,8 @@ sudo tshark -l -nni wlan0 -Y "icmp.type == 8" -T fields -e data 2>/dev/null | wh
     elif [[ "$payload" == "6162" ]]; then
         echo "Received exact 'ab' -> LED OFF"
         pinctrl set 5 op dl
+    else
+        echo "Received standard ping -> No LED action taken"
     fi
     
 done
