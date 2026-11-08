@@ -6,7 +6,7 @@ After=multi-user.target
 Type=simple
 ExecStart=/usr/bin/python3 /home/dk1991/python_stuff/blink_boot.py
 WorkingDirectory=/home/dk1991/python_stuff
-Restart=always
+Restart=on-failure
 User=dk1991
 
 [Install]
