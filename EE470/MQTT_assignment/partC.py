@@ -71,10 +71,14 @@ try:
     client.subscribe(IN_TOPIC)
     print("Subscribed to", IN_TOPIC.decode())
     
-    # State tracking for the switch and 5-second timer
+    # State tracking variables
     last_switch_state = switch_pin.value()
     waiting_for_zero = False
     timer_start = 0
+    
+    # Telemetry interval timer (15 seconds = 15000 milliseconds)
+    telemetry_timer = time.ticks_ms()
+    TELEMETRY_INTERVAL = 15000
     
     while True:
         # 1. Non-blocking check for incoming LED messages
@@ -91,7 +95,7 @@ try:
             client.publish(OUT_TOPIC, b"1")
             print("Switch released! Published 1 to outTopic/data")
             
-            # Start the 5-second countdown
+            # Start the 5-second zero-reset countdown
             waiting_for_zero = True
             timer_start = time.ticks_ms()
             
@@ -103,7 +107,21 @@ try:
             print("5 seconds elapsed. Published 0 to outTopic/data")
             waiting_for_zero = False 
             
-        # Small delay to keep the CPU stable
+        # 5. Check if 15 seconds have passed to send periodic telemetry data
+        if time.ticks_diff(time.ticks_ms(), telemetry_timer) >= TELEMETRY_INTERVAL:
+            telemetry_timer = time.ticks_ms() # Reset interval timer
+            
+            # Read sensor values
+            adc_value = pot_pin.read()
+            voltage = adc_value * (3.3 / 1023.0)
+            sw_status = "Pressed" if current_switch_state == 0 else "Unpressed"
+            
+            # Format payload string and publish
+            payload = "Voltage: {:.2f}V | Switch: {}".format(voltage, sw_status)
+            client.publish(OUT_TOPIC, payload.encode('utf-8'))
+            print("Periodic Telemetry Sent:", payload)
+
+        # Small delay to keep the CPU stable and protect the SSL buffer
         time.sleep_ms(50)
 
 except Exception as e:
