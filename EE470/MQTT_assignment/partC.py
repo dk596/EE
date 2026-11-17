@@ -34,11 +34,11 @@ def mqtt_callback(topic, msg):
         
         print("Topic:", safe_topic, "| Payload:", safe_msg)
         
-        if safe_topic == "testtopic/temp/inTopic":
-            if safe_msg == "1":
+        if safe_topic == "testtopic/temp/inTopic" or safe_topic == "testtopic/temp/outTopic/voltage":
+            if safe_msg == "1" or safe_msg == "SWITCH,1":
                 led_pin.value(1)
                 print(">>> LED Turned ON (Exact Match)")
-            elif safe_msg == "0":
+            elif safe_msg == "0" or safe_msg == "SWITCH,0":
                 led_pin.value(0)
                 print(">>> LED Turned OFF (Exact Match)")
             else:
@@ -49,7 +49,7 @@ def mqtt_callback(topic, msg):
 # --- 4. Secure MQTT Settings ---
 IN_TOPIC = b"testtopic/temp/inTopic"
 OUT_TOPIC = b"testtopic/temp/outTopic/data"
-
+OUT_TOPIC2 = b"testtopic/temp/outTopic/voltage"
 client = MQTTClient(
     client_id=secrets.MQTT_CLIENT_ID, 
     server=secrets.MQTT_BROKER, 
@@ -70,6 +70,8 @@ try:
     
     client.subscribe(IN_TOPIC)
     print("Subscribed to", IN_TOPIC.decode())
+
+    client.subscribe(OUT_TOPIC2)
     
     # State tracking variables
     last_switch_state = switch_pin.value()
