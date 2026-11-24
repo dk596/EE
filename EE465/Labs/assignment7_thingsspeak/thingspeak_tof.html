@@ -23,7 +23,6 @@
   function sendTalkBack(command) {
     fetch(`https://api.thingspeak.com/talkbacks/${TALKBACK_ID}/commands.json`, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         api_key: TALKBACK_API_KEY,
         command_string: command
