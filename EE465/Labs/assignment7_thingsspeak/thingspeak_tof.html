@@ -14,38 +14,22 @@
   <h2>LED Control</h2>
   <button onclick="sendTalkBack('LED_ON')">Turn LED ON</button>
   <button onclick="sendTalkBack('LED_OFF')">Turn LED OFF</button>
-  <p id="status">Ready.</p>
+
 
   <script>
-    const TALKBACK_ID = "XXX";
-    const TALKBACK_API_KEY = "XXX";
+  const TALKBACK_ID = "XXX";
+  const TALKBACK_API_KEY = "XXX";
 
-    async function sendTalkBack(command) {
-      const statusEl = document.getElementById("status");
-      statusEl.textContent = "Sending " + command + "...";
-
-      try {
-        const body = new URLSearchParams({
-          api_key: TALKBACK_API_KEY,
-          command_string: command
-        });
-
-        const res = await fetch(
-          `https://api.thingspeak.com/talkbacks/${TALKBACK_ID}/commands.json`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: body
-          }
-        );
-
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const data = await res.json();
-        statusEl.textContent = "Queued: " + data.command_string + " (ID #" + data.id + ")";
-      } catch (err) {
-        statusEl.textContent = "Error: " + err.message;
-      }
-    }
+  function sendTalkBack(command) {
+    fetch(`https://api.thingspeak.com/talkbacks/${TALKBACK_ID}/commands.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        api_key: TALKBACK_API_KEY,
+        command_string: command
+      })
+    });
+  }
   </script>
 
 </body>
