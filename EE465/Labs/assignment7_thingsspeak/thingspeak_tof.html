@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ToF &amp; TalkBack LED Control</title>
+</head>
+<body>
+
+  <h2>VL53L1X Distance (cm)</h2>
+  <iframe width="450" height="260" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/3595154/charts/1?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=60&title=ToF+Sensor&type=line&xaxis=Time&yaxis=Distance+%28cm%29"></iframe>
+
+  <h2>LED State History (0 = Off, 1 = On)</h2>
+  <iframe width="450" height="260" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/3595154/charts/2?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=60&title=LED+State&type=line&xaxis=Time"></iframe>
+
+  <h2>LED Control</h2>
+  <button onclick="sendTalkBack('LED_ON')">Turn LED ON</button>
+  <button onclick="sendTalkBack('LED_OFF')">Turn LED OFF</button>
+  <p id="status">Ready.</p>
+
+  <script>
+    const TALKBACK_ID = "XXX";
+    const TALKBACK_API_KEY = "XXX";
+
+    async function sendTalkBack(command) {
+      const statusEl = document.getElementById("status");
+      statusEl.textContent = "Sending " + command + "...";
+
+      try {
+        const body = new URLSearchParams({
+          api_key: TALKBACK_API_KEY,
+          command_string: command
+        });
+
+        const res = await fetch(
+          `https://api.thingspeak.com/talkbacks/${TALKBACK_ID}/commands.json`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: body
+          }
+        );
+
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        statusEl.textContent = "Queued: " + data.command_string + " (ID #" + data.id + ")";
+      } catch (err) {
+        statusEl.textContent = "Error: " + err.message;
+      }
+    }
+  </script>
+
+</body>
+</html>
